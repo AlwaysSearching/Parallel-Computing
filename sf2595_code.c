@@ -18,14 +18,14 @@ int main(int argc, char *argv[]) {
 	MPI_Init(NULL, NULL);
 	MPI_Comm MCW = MPI_COMM_WORLD;
 
-	MPI_Comm_rank(&rank, MCW);
-	MPI_Comm_size(&size, MCW);
+	MPI_Comm_rank(MCW, &rank);
+	MPI_Comm_size(MCW, &size);
 
         unsigned int a, b, c, n;
         unsigned int i; //loop index
         FILE * fp; //for creating the output file
         char filename[100]=""; // the file name
-        char * x; //the numbers in the range [2, N]
+        int * x; //the numbers in the range [2, N]
 
         clock_t start_p1, start_p3, end_p1,  end_p3;
 
@@ -52,9 +52,6 @@ int main(int argc, char *argv[]) {
         	a = (unsigned int)atoi(argv[2]);
         	b = (unsigned int)atoi(argv[3]);
         	c = (unsigned int)atoi(argv[4]);
-
-		// initialize the array x;
-		memset(x, 0, n - 1);
 	}
 
 	// Process 0 must now send the a, b, c, and n to each process
@@ -74,9 +71,9 @@ int main(int argc, char *argv[]) {
 	double start_p2 = MPI_Wtime();
 
 	// calculate the range for each process.
-	int quotient, remainder, my_first; my_last, my_count;
+	int quotient, remainder, my_first, my_count;
 	quotient =  (n - 1) / size;
-	remainder = (n -1) % size;
+	remainder = (n - 1) % size;
 	
 	if (rank < remainder){
 		my_count = quotient + 1;
@@ -84,81 +81,93 @@ int main(int argc, char *argv[]) {
 	}
 	else {
 		my_count = quotient;
-		my_first = (my_rank * my_count) + remainder;
+		my_first = (rank * my_count) + remainder;
 	}
 
-	my_last = my_first + my_count;
-	
 	// each array calculates its own list
-	if (my_rank == 0) {
-		x = malloc((n-1)* sizeof(char));
-		
-		// compute divisable elements.
-		for (int i = my_first; i < my_last; i++) {
+	if (rank == 0) {
+		// a global and a local x
+		x = (int *) malloc((n - 1)* sizeof(int));
+		int * my_x = (int *) malloc(my_count * sizeof(int));
+ 	
+		for (int i = 0; i < my_count; i++) {
 			if ( (i+2) % a == 0 || (i+2) % b == 0 || (i+2) % c == 0) {
-				x[i] = 1;
+				my_x[i] = 1;
 			}
 			else {
-				x[i] = 0;
+				my_x[i] = 0;
 			}
-		}	
+		}
 
-		MPI_Gather(&x, my_count, MPI_CHAR, &x, my_count, MPI_CHAR, 0, MCW);
+		MPI_Gather(my_x, my_count, MPI_INT, x, my_count, MPI_INT, 0, MCW);
+		free(my_x);		
 	}
-	else {	
-		x = malloc(my_count * sizeof(char));
+	else {
+		int * my_x = (int *) malloc(my_count * sizeof(int));
 
                 // compute divisable elements.
-		for (int i = my_first; i < my_last; i++) {
-                	if ( (i+2) % a == 0 || (i+2) % b == 0 || (i+2) % c == 0) {
-                        	x[i] = 1;
-                        }
+		for (int i = 0; i < my_count; i++) {
+                	if ( (my_first + i + 2) % a == 0 || (my_first + i + 2) % b == 0 || (my_first + i + 2) % c == 0) {
+                        	my_x[i] = 1;
+			}
                         else {
-                                x[i] = 0;
+                                my_x[i] = 0;
                         }
                 }
 
-		// send to process 0
-		MPI_Gather(&x, my_count, MPI_CHAR, &x, my_count, MPI_CHAR, 0, MCW);
+		// send to process 0 and free
+		MPI_Gather(my_x, my_count, MPI_INT, NULL, my_count, MPI_INT, 0, MCW);
+		free(my_x);
 	}
-
+	
 	// end of part 2
 	double end_p2 = MPI_Wtime();
 
 	// reduce using MPI_Reduce - MPI_MAX & MPI_MIN
-
+	double max_time;
+	double my_time = end_p2 - start_p2; 
+	
+	
+	MPI_Reduce(&my_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MCW);
+	
+	
         //start of part 3
         //forming the filename, we only need process 0 to do work here.
-	
-	
 	if (rank == 0) {
-        	// start timer
+		// start timer
 		start_p3 = clock();
+        	
+		strcpy(filename, argv[1]);
+        	strcat(filename, ".txt");
 		
-        	strcpy(filename, argv[1]);
-        	strcpy(filename, ".txt");
-
-        	if( !(fp = fopen(filename,"w+t")))
+		if( !(fp = fopen(filename,"w")))
         	{
                 	printf("Cannot create file %s\n", filename);
                 	exit(1);
         	}	
-
-        	for(i = 2; i <= n; i++)
-                	if(x[i]){
-                        	fprintf(fp, "%d ", i);
+		
+		for(i = 0; i <= n-2; i++)
+                {
+			if(x[i]){				
+                        	fprintf(fp, "%d ", i+2);
                 	}
         	}	
-
+		fflush(fp);	
+		fclose(fp);	
         	end_p3 = clock();
         	//end of part 3. Close timer.
+	
+		free(x);		
+		double time_1 = (end_p1 - start_p1) / CLOCKS_PER_SEC;
+		double time_2 = max_time;
+		double time_3 = (end_p3 - start_p3) / CLOCKS_PER_SEC; 
+        	
+		/* Print the times of the three parts*/
+		printf("Time 1 = %f \t Time 2 = %f \t Time 3 = %f \n", time_1, time_2, time_3);
+		
 
-        	/* Print the times of the three parts*/
-		if (my_rank == 0) {
-			printf("Time 1 = \t Time 2 = \t Time 3 = \n", time_1, time_2, time_3);
-		}
 	}
-
+	
 	// finalize and return
 	MPI_Finalize();
         return 0;
