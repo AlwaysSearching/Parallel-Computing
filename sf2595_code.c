@@ -7,10 +7,9 @@
 /*
  * int main(int argc, char* argv[])
  *
- * program to ...
- *
- *
- *
+ * program to find all numbers between 2 and N that are divisible by at least one 
+ * of the 3 numbers passed to the function. The MPI functions utilized in communication 
+ * are MPI_Bcast, MPI_Gatherv, & MPI_Reduce.
  */
 int main(int argc, char *argv[]) {
 	// Initialize MPI, and get rank & number processes
@@ -179,12 +178,6 @@ int main(int argc, char *argv[]) {
         	
 		/* Print the times of the three parts*/
 		printf("Time 1 = %f Time 2 = %f Time 3 = %f \n", time_1, time_2, time_3);		
-
-		char name[6]; 			
-		snprintf(name, 6+1, "%d.txt", size);
-		fp = fopen(name, "a");
-		fprintf(fp, "%f ", time_2);
-		fclose(fp);
 	}
 	
 	// finalize and return
