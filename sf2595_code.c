@@ -52,6 +52,8 @@ int main(int argc, char *argv[]) {
         	a = (unsigned int)atoi(argv[2]);
         	b = (unsigned int)atoi(argv[3]);
         	c = (unsigned int)atoi(argv[4]);
+		
+		x = (int *) calloc(n-1 ,sizeof(int));
 	}
 
 	// Process 0 must now send the a, b, c, and n to each process
@@ -61,19 +63,19 @@ int main(int argc, char *argv[]) {
 	MPI_Bcast(&b, 1, MPI_INT, 0, MCW);
 	MPI_Bcast(&c, 1, MPI_INT, 0, MCW);
 	MPI_Bcast(&n, 1, MPI_INT, 0, MCW);
-	
 	end_p1 = clock();
 	// end part 1
 
 	// start part 2. Note that the time for this section is the min start time and max end time.
 	// Other processes must, after receiving the variables, calculate their own range.
-	
 	double start_p2 = MPI_Wtime();
 
 	// calculate the range for each process.
 	int quotient, remainder, my_first, my_count;
-	quotient =  (n - 1) / size;
-	remainder = (n - 1) % size;
+	div_t d = div(n-1, size);
+		
+	quotient =  d.quot;
+	remainder = d.rem;
 	
 	if (rank < remainder){
 		my_count = quotient + 1;
@@ -83,42 +85,54 @@ int main(int argc, char *argv[]) {
 		my_count = quotient;
 		my_first = (rank * my_count) + remainder;
 	}
-
+	
+	// We need to calculate the start points and displacements to use MPI_Gatherv.
+	// These are calculated and stored in arrays.	
+	int start = 0;
+	int * displace = (int *)calloc(size, sizeof(int));
+	int * counts = (int *)calloc(size, sizeof(int));
+	for (int i = 0; i < size; i++) {
+		displace[i] = start;
+		if (i < remainder){
+			counts[i] = quotient + 1;
+                	start += quotient + 1;
+        	}
+        	else {
+                	counts[i] = quotient;
+                	start += quotient;
+        	}	
+	}
+	
+	int * my_x = (int *) calloc(my_count, sizeof(int));
+	
 	// each array calculates its own list
 	if (rank == 0) {
-		// a global and a local x
-		x = (int *) malloc((n - 1)* sizeof(int));
-		int * my_x = (int *) malloc(my_count * sizeof(int));
- 	
+		int * my_x = (int *) calloc(my_count, sizeof(int));
+		
+		// compute divisible elements
 		for (int i = 0; i < my_count; i++) {
 			if ( (i+2) % a == 0 || (i+2) % b == 0 || (i+2) % c == 0) {
 				my_x[i] = 1;
 			}
-			else {
-				my_x[i] = 0;
-			}
 		}
 
-		MPI_Gather(my_x, my_count, MPI_INT, x, my_count, MPI_INT, 0, MCW);
-		free(my_x);		
+		MPI_Gatherv(my_x, my_count, MPI_INT, x, counts, displace, MPI_INT, 0, MCW);		
 	}
 	else {
-		int * my_x = (int *) malloc(my_count * sizeof(int));
+		int * my_x = (int *) calloc(my_count, sizeof(int));
 
                 // compute divisable elements.
 		for (int i = 0; i < my_count; i++) {
                 	if ( (my_first + i + 2) % a == 0 || (my_first + i + 2) % b == 0 || (my_first + i + 2) % c == 0) {
                         	my_x[i] = 1;
 			}
-                        else {
-                                my_x[i] = 0;
-                        }
-                }
+		}
 
-		// send to process 0 and free
-		MPI_Gather(my_x, my_count, MPI_INT, NULL, my_count, MPI_INT, 0, MCW);
-		free(my_x);
+		// send to process 0 
+		MPI_Gatherv(my_x, my_count, MPI_INT, NULL, counts, displace, MPI_INT, 0, MCW);
 	}
+	
+	free(my_x);
 	
 	// end of part 2
 	double end_p2 = MPI_Wtime();
@@ -132,7 +146,6 @@ int main(int argc, char *argv[]) {
 	
 	
         //start of part 3
-        //forming the filename, we only need process 0 to do work here.
 	if (rank == 0) {
 		// start timer
 		start_p3 = clock();
@@ -149,23 +162,29 @@ int main(int argc, char *argv[]) {
 		for(i = 0; i <= n-2; i++)
                 {
 			if(x[i]){				
-                        	fprintf(fp, "%d ", i+2);
+                        	fprintf(fp, "%d ", i + 2);
                 	}
-        	}	
-		fflush(fp);	
+        	}
+		
+		if (x == NULL) {printf("HOW IS IT NULL?? \n");}
+		free(x);
+		
 		fclose(fp);	
         	end_p3 = clock();
         	//end of part 3. Close timer.
 	
-		free(x);		
 		double time_1 = (end_p1 - start_p1) / CLOCKS_PER_SEC;
 		double time_2 = max_time;
 		double time_3 = (end_p3 - start_p3) / CLOCKS_PER_SEC; 
         	
 		/* Print the times of the three parts*/
-		printf("Time 1 = %f \t Time 2 = %f \t Time 3 = %f \n", time_1, time_2, time_3);
-		
+		printf("Time 1 = %f Time 2 = %f Time 3 = %f \n", time_1, time_2, time_3);		
 
+		char name[6]; 			
+		snprintf(name, 6+1, "%d.txt", size);
+		fp = fopen(name, "a");
+		fprintf(fp, "%f ", time_2);
+		fclose(fp);
 	}
 	
 	// finalize and return
