@@ -19,7 +19,7 @@
 #include <string.h>
 #include <omp.h>
 
-void find_primes(int from, int to, int* primes, int* N, int t);
+void find_primes(int from, int to, int* primes, int* N, int* integers, int t);
 
 
 /* 
@@ -45,7 +45,7 @@ main ( int argc, char *argv[] )
 	int prime_count = 0;
 	
 	
-	int slice_size = 2 << 20; // ~1,000,000
+	int slice_size = 2 << 20; // ~1000000
 	int from, to;
 	
 	// call find primes until we reach N
@@ -54,10 +54,11 @@ main ( int argc, char *argv[] )
 		if (N < to) {
 			to = N;
 		}
-		printf("Calling find_primes \n");
 		
+		int* integers = (int *) malloc((from-to)*sizeof(int));	
+		memset(integers, 1, (from-to)*sizeof(int));
 
-		find_primes(from, to, primes, &prime_count, t);
+		find_primes(from, to, primes, &prime_count, integers, t);
 	}
 	
 	printf("Found Primes");
@@ -94,20 +95,13 @@ main ( int argc, char *argv[] )
  * 	N is the length of the list primes.
  */
 void 
-find_primes(int from, int to, int* primes, int* N, int t)
+find_primes(int from, int to, int* primes, int* N, int* integers, int t)
 {
 	// current range of numbers. and mid point
 	int mem_size = (from - to); 
 	int mid = floor((mem_size + 1) / 2);
 	
 	printf("Made it to func");
-
-	// Allocate block of memory for current block of memory.
-	int* integers = (int *) malloc(mem_size * sizeof(int));
-	memset(integers, 1, mem_size*sizeof(int));
-
-	printf("Set integers");
-	return;
 	
 	// Mark all numbers in the current range that are multiples of the already
 	// found prime numbers.
