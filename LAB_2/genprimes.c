@@ -29,6 +29,9 @@
 int
 main ( int argc, char *argv[] )
 {
+	double tstart = 0.0;
+	double ttime = 0.0;
+
 	// find all primes from 2 to N.
 	int N = atoi(argv[1]);
 	int mid = floor((N + 1)/2);
@@ -37,18 +40,26 @@ main ( int argc, char *argv[] )
 	int t = atoi(argv[2]);
 	
 	// allocate memory for a pointer to the list of primes. 
-	int* primes = (int  *) malloc((N-2)*sizeof(int));
-	memset(primes, 0, (N-2)*sizeof(int));	
-	int i, k;
+	char* primes = (char  *) malloc((N-2)*sizeof(char));
+	memset(primes, 0, (N-2)*sizeof(char));	
+	
+	tstart = omp_get_wtime();
+
+	int i;
+	int k;
+
+#	pragma omp parallel for shared(primes) private(k, i) num_threads(t) schedule(static, 1)
 	for (i = 2; i <= mid; i++) {
-		if(primes[i-2] == 0) {
-#			pragma omp parallel for num_threads(t) shared(primes, i, k) private(k)
-			for (k = 2*i; k < N; k +=i) {
+		if (primes[i - 2] ==0) {
+			for (k = 2*i; k < N; k += i) {
 				primes[k-2] = 1;
 			}
 		}
 	}
-		
+	
+	ttime = omp_get_wtime() - tstart;
+	printf("Time take for the main part: %f\n", ttime);
+	
 	// open file and write primes.
 	char filename[100] = "";
 	strcat(filename, argv[1]);
@@ -72,5 +83,3 @@ main ( int argc, char *argv[] )
 
 	return EXIT_SUCCESS;
 }				/* ----------  end of function main  ---------- */
-
-
